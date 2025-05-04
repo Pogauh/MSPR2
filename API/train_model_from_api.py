@@ -7,8 +7,8 @@ from sklearn.metrics import mean_absolute_error
 import joblib
 
 BASE_URL = "http://127.0.0.1:8000"
-START_DATE = "2021-01-01"
-END_DATE = "2021-07-01"
+START_DATE = "2020-01-01"
+END_DATE = "2022-02-01"
 
 def get_epidemiologie(date_str, session):
     try:
@@ -72,11 +72,12 @@ def train_model(df):
         return
 
     df = df.dropna()
-    df = df[df["nbr_hospitalises"] >= 0]
-    df = df[df["nbr_hospitalises"] < df["nbr_hospitalises"].quantile(0.99)]
+    df = df[df["nbr_hospitalises"] >= 0]  # Élimine les valeurs invalides
+    df = df[df["nbr_hospitalises"] < df["nbr_hospitalises"].quantile(0.99)]  # Élimine les extrêmes
 
     if "region" in df.columns:
         df = pd.get_dummies(df, columns=["region"], drop_first=False)
+        
     else:
         print("❌ Colonne 'region' manquante. Impossible de créer les variables indicatrices.")
         return
@@ -85,31 +86,20 @@ def train_model(df):
     X = df[features]
     y = df["nbr_hospitalises"]
 
-    # ⬅️ C'est ici qu'on doit définir X_train avant la boucle
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    n_estimators_list = [50, 100, 200, 300, 500]
-    best_mae = float("inf")
-    best_model = None
+    model = RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1)
+    model.fit(X_train, y_train)
 
-    for n in n_estimators_list:
-        print(f"\n🌲 Entraînement avec {n} arbres...")
-        model = RandomForestRegressor(n_estimators=n, random_state=42)
-        model.fit(X_train, y_train)
+    print("Colonnes utilisées dans le modèle :", model.feature_names_in_)
 
-        preds = model.predict(X_test)
-        mae = mean_absolute_error(y_test, preds)
-        print(f"📉 MAE avec {n} arbres : {mae:.2f}")
 
-        if mae < best_mae:
-            best_mae = mae
-            best_model = model
-            best_n = n
+    preds = model.predict(X_test)
+    mae = mean_absolute_error(y_test, preds)
+    print(f"📉 MAE: {mae:.2f}")
 
-    print(f"\n🏆 Meilleur modèle : {best_n} arbres avec MAE = {best_mae:.2f}")
-    joblib.dump(best_model, f"hospitalisation_model_{best_n}_trees.pkl")
-    print(f"✅ Modèle sauvegardé dans hospitalisation_model_{best_n}_trees.pkl")
-
+    joblib.dump(model, "hospitalisation_model.pkl")
+    print("✅ Modèle sauvegardé dans hospitalisation_model.pkl")
 
 def main():
     print("🔄 Création de la session HTTP...")

@@ -30,43 +30,57 @@ def get_db():
 
 
 
+# Chargement du modèle
+MODEL_PATH = Path("hospitalisation_model.pkl")
 
 
+if not MODEL_PATH.exists():
+    raise RuntimeError(f"❌ Modèle introuvable à l'emplacement {MODEL_PATH}")
+model = joblib.load(MODEL_PATH)
+
+
+
+# Création de l'application FastAPI
+app = FastAPI(title="API de Prédiction des Hospitalisations")
+
+# Schéma d'entrée
 class PredictionInput(BaseModel):
     day: int
     month: int
+    year: int
     population: int
-    region: str  
+    region: str
 
-
-
+# Endpoint de prédiction
 @app.post("/predict")
 def predict(input_data: PredictionInput):
-    # Créer une ligne vide avec les colonnes d'entraînement
+    # Créer une ligne vide avec les colonnes du modèle
     data = {col: 0 for col in model.feature_names_in_}
-    print([col for col in model.feature_names_in_ if col.startswith("region_")])
     data["day"] = input_data.day
     data["month"] = input_data.month
+    data["year"] = input_data.year
+
     data["population"] = input_data.population
 
-    # Normaliser la région entrée (sans accents, minuscules)
+    # Nettoyage du nom de région (accents, case)
     input_region_clean = unidecode.unidecode(input_data.region.strip()).lower()
-
     matched = False
+
     for col in data:
         if col.startswith("region_"):
-            col_clean = unidecode.unidecode(col.replace("region_", "")).lower()
-            if col_clean == input_region_clean:
+            region_col_clean = unidecode.unidecode(col.replace("region_", "")).lower()
+            if region_col_clean == input_region_clean:
                 data[col] = 1
                 matched = True
                 break
 
     if not matched:
-        return {"error": f"Région inconnue : {input_data.region}"}
+        raise HTTPException(status_code=400, detail=f"Région inconnue : {input_data.region}")
 
     df = pd.DataFrame([data])
     prediction = model.predict(df)[0]
-    return {"prediction": prediction}
+
+    return {"prediction": round(prediction)}
 
 # ======= MALADIE =======
 @app.post("/maladies/")
