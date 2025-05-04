@@ -1,0 +1,50 @@
+CREATE TABLE Maladie(
+   id_maladie INTEGER,
+   nom_maladie CHAR(50),
+   nom_specifique CHAR(50),
+   type CHAR(20),
+   PRIMARY KEY(id_maladie)
+);
+
+CREATE TABLE Pays(
+   country_code CHAR(2),
+   country_name CHAR(60) NOT NULL,
+   PRIMARY KEY(country_code)
+);
+
+CREATE TABLE Traitement(
+   id_traitement INTEGER,
+   nom_traitement CHAR(30),
+   PRIMARY KEY(id_traitement)
+);
+
+CREATE TABLE Region(
+   location_key CHAR(7),
+   population BIGINT,
+   subregion1_name CHAR(30),
+   country_code CHAR(2) NOT NULL,
+   PRIMARY KEY(location_key),
+   FOREIGN KEY(country_code) REFERENCES Pays(country_code)
+);
+
+CREATE TABLE Epidemiologie(
+   id_maladie INTEGER,
+   location_key CHAR(7),
+   nbr_cas INTEGER,
+   nbr_hospitalises INTEGER,
+   nbr_morts INTEGER,
+   date_controle DATE,
+   morts_cumule INTEGER,
+   contamination_cumule INTEGER,
+   PRIMARY KEY(id_maladie, location_key),
+   FOREIGN KEY(id_maladie) REFERENCES Maladie(id_maladie),
+   FOREIGN KEY(location_key) REFERENCES Region(location_key)
+);
+
+CREATE TABLE Traite(
+   id_maladie INTEGER,
+   id_traitement INTEGER,
+   PRIMARY KEY(id_maladie, id_traitement),
+   FOREIGN KEY(id_maladie) REFERENCES Maladie(id_maladie),
+   FOREIGN KEY(id_traitement) REFERENCES Traitement(id_traitement)
+);

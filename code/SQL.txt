@@ -1,0 +1,64 @@
+CREATE TABLE Maladie(
+   id_maladie INTEGER,
+   nom_maladie CHAR(50),
+   nom_specifique CHAR(50),
+   type CHAR(20),
+   PRIMARY KEY(id_maladie)
+);
+
+CREATE TABLE Variant(
+   Date_ DATE,
+   nom_variant CHAR(50),
+   pays CHAR(60),
+   infecte INTEGER,
+   id_maladie INTEGER NOT NULL,
+   PRIMARY KEY(Date_),
+   FOREIGN KEY(id_maladie) REFERENCES Maladie(id_maladie)
+);
+
+CREATE TABLE Pays(
+   country_code CHAR(2),
+   country_name CHAR(60) NOT NULL,
+   PRIMARY KEY(country_code)
+);
+
+CREATE TABLE Traitement(
+   id_traitement INTEGER,
+   nom_traitement CHAR(30),
+   PRIMARY KEY(id_traitement)
+);
+
+CREATE TABLE Region(
+   location_key CHAR(7),
+   population BIGINT,
+   subregion1_name CHAR(30),
+   country_code CHAR(2) NOT NULL,
+   PRIMARY KEY(location_key),
+   FOREIGN KEY(country_code) REFERENCES Pays(country_code)
+);
+
+CREATE TABLE Epidemiologie(
+   Date_ DATE,
+   location_key CHAR(7),
+   nbr_cas INTEGER,
+   nbr_hospitalises INTEGER,
+   temps_incubation INTEGER,
+   vitesse_mortalite INTEGER,
+   taux_contamination NUMERIC(5,2),
+   nbr_morts INTEGER,
+   date_controle DATE,
+   infections_jours INTEGER,
+   morts_cumule INTEGER,
+   contamination_cumule INTEGER,
+   PRIMARY KEY(Date_, location_key),
+   FOREIGN KEY(Date_) REFERENCES Variant(Date_),
+   FOREIGN KEY(location_key) REFERENCES Region(location_key)
+);
+
+CREATE TABLE Traite(
+   Date_ DATE,
+   id_traitement INTEGER,
+   PRIMARY KEY(Date_, id_traitement),
+   FOREIGN KEY(Date_) REFERENCES Variant(Date_),
+   FOREIGN KEY(id_traitement) REFERENCES Traitement(id_traitement)
+);
