@@ -2,13 +2,13 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 import joblib
+import matplotlib.pyplot as plt
 
 BASE_URL = "http://127.0.0.1:8000"
 START_DATE = "2020-01-01"
-END_DATE = "2022-02-01"
+END_DATE = "2022-01-01"
 
 def get_epidemiologie(date_str, session):
     try:
@@ -40,6 +40,7 @@ def fetch_dataset(start_date, end_date, session):
     current_date = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d")
 
+    # Collecte des données
     while current_date <= end:
         date_str = current_date.strftime("%Y-%m-%d")
         entries = get_epidemiologie(date_str, session)
@@ -49,6 +50,7 @@ def fetch_dataset(start_date, end_date, session):
                 loc_key = entry.get("location_key", "").strip()
                 region_data = region_lookup.get(loc_key)
                 if region_data:
+                    nbr_hospitalises = entry.get("nbr_hospitalises", 0)
                     data.append({
                         "date": entry["date_jour"],
                         "day": current_date.day,
@@ -58,13 +60,20 @@ def fetch_dataset(start_date, end_date, session):
                         "location_key": loc_key,
                         "region": region_data.get("subregion1_name", "").strip(),
                         "population": region_data.get("population", 0),
-                        "nbr_hospitalises": entry.get("nbr_hospitalises", 0)
+                        "nbr_hospitalises": nbr_hospitalises
                     })
 
         current_date += timedelta(days=1)
 
     print(f"{len(data)} enregistrements collectés.")
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+
+    # Filtrer les régions n'ayant jamais eu d'hospitalisation
+    regions_avec_hospitalisation = df[df["nbr_hospitalises"] > 0]["region"].unique()
+    df = df[df["region"].isin(regions_avec_hospitalisation)]  # Garder uniquement les régions avec au moins une hospitalisation
+
+    print(f"Nombre de régions avec des hospitalisations : {len(regions_avec_hospitalisation)}")
+    return df
 
 def train_model(df):
     if df.empty:
@@ -77,26 +86,46 @@ def train_model(df):
 
     if "region" in df.columns:
         df = pd.get_dummies(df, columns=["region"], drop_first=False)
-        
     else:
         print("❌ Colonne 'region' manquante. Impossible de créer les variables indicatrices.")
         return
 
     features = ["day", "month", "year", "week", "population"] + [col for col in df.columns if col.startswith("region_")]
-    X = df[features]
-    y = df["nbr_hospitalises"]
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date")
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Split temporel : train avant 2022, test sur janvier 2022
+    train_df = df[df["date"] < "2022-09-01"]
+    test_df = df[df["date"] >= "2022-01-01"]
 
-    model = RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1)
+    X_train = train_df[features]
+    y_train = train_df["nbr_hospitalises"]
+    X_test = test_df[features]
+    y_test = test_df["nbr_hospitalises"]
+
+    model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
     model.fit(X_train, y_train)
 
-    print("Colonnes utilisées dans le modèle :", model.feature_names_in_)
-
-
+    # Prédictions
     preds = model.predict(X_test)
     mae = mean_absolute_error(y_test, preds)
     print(f"📉 MAE: {mae:.2f}")
+
+    # Visualisation des prédictions vs réelles
+    plt.figure(figsize=(14, 5))
+    plt.plot(y_test.values[:100], label="Réel")
+    plt.plot(preds[:100], label="Prédit")
+    plt.title("Hospitalisations réelles vs prédites")
+    plt.legend()
+    plt.grid()
+    
+    # Sauvegarde du graphique sans l'afficher
+    plt.savefig("hospitalisations_predictions.png")
+    print("Graphique sauvegardé dans 'hospitalisations_predictions.png'.")
+
+    # Le programme continue sans attendre que la fenêtre se ferme
+    plt.close()
+    plt.show()
 
     joblib.dump(model, "hospitalisation_model.pkl")
     print("✅ Modèle sauvegardé dans hospitalisation_model.pkl")
@@ -107,8 +136,8 @@ def main():
 
     print("⬇️  Chargement des données depuis l’API...")
     df = fetch_dataset(START_DATE, END_DATE, session)
-    df.to_csv("dataset_hospitalisations.csv", index=False)
-    print("💾 Dataset sauvegardé dans dataset_hospitalisations.csv")
+    df.to_csv("dataset_hospitalisation.csv", index=False)
+    print("💾 Dataset sauvegardé dans dataset_hospitalisation.csv")
 
     print("🏋️ Entraînement du modèle...")
     train_model(df)

@@ -30,13 +30,7 @@ def get_db():
 
 
 
-# Chargement du modèle
-MODEL_PATH = Path("hospitalisation_model.pkl")
 
-
-if not MODEL_PATH.exists():
-    raise RuntimeError(f"❌ Modèle introuvable à l'emplacement {MODEL_PATH}")
-model = joblib.load(MODEL_PATH)
 
 
 
